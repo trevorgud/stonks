@@ -72,14 +72,20 @@ class InProgress():
     def __init__(self, acctPositions, orders):
         self.positions = {}
         for account in acctPositions:
+            accountNumber = account['securitiesAccount']['accountNumber']
             positions = account['securitiesAccount']['positions']
+            self.positions[accountNumber] = []
             # TODO: Implement storage of account positions and open orders to track which trades are
             # already in progress.
+            for position in positions:
+                symbol = position['instrument']['symbol']
+                self.positions[accountNumber].append(symbol)
         self.orders = orders
     
-    def isInProgress(account, symbol):
+    def isInProgress(self, accountNumber, symbol):
         # TODO: Implement
-        return False
+        accountSymbols = self.positions[accountNumber]
+        return symbol in accountSymbols
 
 
 def buy(accountHash, symbol):
@@ -119,6 +125,12 @@ def main():
     json_string = json.dumps(details)
     # print(json_string)
 
+    # # TODO: Figure out how to check open orders for all accounts.
+    # orders = client.account_orders_all().json()
+    # json_string = json.dumps(details)
+
+    progress = InProgress(acctPositions=details, orders=None)
+
     # Create the parser object
     parser = argparse.ArgumentParser(description="Process stock transactions: buy or sell a stock")
 
@@ -142,29 +154,35 @@ def main():
     for account in accounts:
         account_num = account['accountNumber']
         hash_val = account['hashValue']
-        post_order_payload = design_order(
-                    args.symbol,
-                    # price="5000",
-                    order_type="MARKET",
-                    instruction="BUY",
-                    quantity=f"1",
-                    leg_id="1",
-                    order_leg_type="EQUITY",
-                    asset_type="EQUITY",
-                )
-        print(json.dumps(post_order_payload))
-        resp = client.order_place(accountHash=hash_val, order=post_order_payload)
-        code = resp.status_code
-        print(code)
-        body = json.dumps(resp.json())
-        print(body)
+        print(account_num)
+        status = progress.isInProgress(accountNumber=account_num, symbol=args.symbol)
+        print(account_num, status)
+    # for account in accounts:
+    #     account_num = account['accountNumber']
+    #     hash_val = account['hashValue']
+    #     post_order_payload = design_order(
+    #                 args.symbol,
+    #                 # price="5000",
+    #                 order_type="MARKET",
+    #                 instruction="BUY",
+    #                 quantity=f"1",
+    #                 leg_id="1",
+    #                 order_leg_type="EQUITY",
+    #                 asset_type="EQUITY",
+    #             )
+    #     print(json.dumps(post_order_payload))
+    #     resp = client.order_place(accountHash=hash_val, order=post_order_payload)
+    #     code = resp.status_code
+    #     print(code)
+    #     body = json.dumps(resp.json())
+    #     print(body)
 
         # # TODO: Use this one instead, not inline:
         # buy(accountHash=hash_val, symbol=args.symbol)
 
         # if code >= 300:
         #     print(body)
-        break
+        #break
 
 
     ## Schwab-py
