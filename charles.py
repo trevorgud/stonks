@@ -2,6 +2,7 @@ from dotenv import load_dotenv
 from schwab import auth, client
 import schwabdev
 
+from typing import Optional
 import argparse
 import json
 import os
@@ -16,11 +17,10 @@ import os
 
 ## Sell 1 of each per account
 ## Don't sell 1 if not owned 1
+## But should be able to sell "all" if owning fractional share (ex: reverse split failed).
 ## Post a warning if stock below certain limit (less $1)
 ## Handle errors: terminate if any error.
 
-
-from typing import Optional
 
 
 def design_order(
@@ -40,7 +40,6 @@ def design_order(
     # special_instruction="ALL_OR_NONE",
     order_strategy_type="SINGLE",
 ):
-
     post_order_payload = {
         "price": price,
         "session": session,
@@ -73,10 +72,12 @@ class InProgress():
         self.positions = {}
         for account in acctPositions:
             accountNumber = account['securitiesAccount']['accountNumber']
-            positions = account['securitiesAccount']['positions']
+            positions = account['securitiesAccount'].get('positions')
             self.positions[accountNumber] = []
             # TODO: Implement storage of account positions and open orders to track which trades are
             # already in progress.
+            if positions is None:
+                continue
             for position in positions:
                 symbol = position['instrument']['symbol']
                 self.positions[accountNumber].append(symbol)
@@ -88,25 +89,41 @@ class InProgress():
         return symbol in accountSymbols
 
 
-def buy(accountHash, symbol):
+def buyStock(client, accountHash, symbol):
     post_order_payload = design_order(
-                symbol,
-                # price="5000",
-                order_type="MARKET",
-                instruction="BUY",
-                quantity=f"1",
-                leg_id="1",
-                order_leg_type="EQUITY",
-                asset_type="EQUITY",
-            )
+        symbol,
+        order_type="MARKET",
+        instruction="BUY",
+        quantity=f"1",
+        leg_id="1",
+        order_leg_type="EQUITY",
+        asset_type="EQUITY",
+    )
     print(json.dumps(post_order_payload))
     resp = client.order_place(accountHash=accountHash, order=post_order_payload)
     code = resp.status_code
     print(code)
-    body = json.dumps(resp.json())
+    body = json.dumps(resp.text)
     print(body)
     return resp
 
+def sellStock(client, accountHash, symbol):
+    post_order_payload = design_order(
+        symbol,
+        order_type="MARKET",
+        instruction="SELL",
+        quantity=f"1",
+        leg_id="1",
+        order_leg_type="EQUITY",
+        asset_type="EQUITY",
+    )
+    print(json.dumps(post_order_payload))
+    resp = client.order_place(accountHash=accountHash, order=post_order_payload)
+    code = resp.status_code
+    print(code)
+    body = json.dumps(resp.text)
+    print(body)
+    return resp
 
 def main():
     load_dotenv()
@@ -154,9 +171,18 @@ def main():
     for account in accounts:
         account_num = account['accountNumber']
         hash_val = account['hashValue']
-        print(account_num)
-        status = progress.isInProgress(accountNumber=account_num, symbol=args.symbol)
-        print(account_num, status)
+
+        stockInProgress = progress.isInProgress(accountNumber=account_num, symbol=args.symbol)
+        print(account_num, stockInProgress)
+
+        if args.buy and not stockInProgress:
+            resp = buyStock(client=client, accountHash=hash_val, symbol=args.symbol)
+            if resp.status_code > 300:
+                break
+        elif args.sell and stockInProgress:
+            resp = sellStock(client=client, accountHash=hash_val, symbol=args.symbol)
+            if resp.status_code > 300:
+                break
     # for account in accounts:
     #     account_num = account['accountNumber']
     #     hash_val = account['hashValue']
@@ -194,8 +220,6 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
 
 
         # # From charles schwab developer api docs:
