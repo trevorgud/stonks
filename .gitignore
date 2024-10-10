@@ -1,3 +1,6 @@
+# Charles schwab Oauth2 tokens
+tokens.json
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
