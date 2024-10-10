@@ -85,18 +85,101 @@ def share_value(token, symbol):
     return value
 
 
+def account_ids(token):
+    profile = user_profile(token)
+    accounts = profile['profile']['account']
+    account_ids = []
+    for account in accounts:
+        account_number = account['account_number']
+        print(account_number)
+        account_ids.append(account_number)
+    return account_ids
+
+
+def user_profile(token):
+    profile_url = f"https://api.tradier.com/v1/user/profile"
+    # Headers, including the Authorization Bearer Token and Accept header
+    headers = {
+        'Authorization': f'Bearer {token}',
+        'Accept': 'application/json',
+    }
+    # Make the GET request
+    response = requests.get(profile_url, headers=headers)
+    data = response.json()
+    print(data)
+    return data
+
+
+def account_symbols(account_id, token):
+    symbols = []
+    positions = account_positions(account_id, token)
+    if positions['positions'] == 'null':
+        return symbols
+    found_positions = positions['positions']['position']
+    for each in found_positions:
+        symbols.append(each['symbol'])
+    return symbols
+
+
+def account_positions(account_id, token):
+    positions_url = f"https://api.tradier.com/v1/accounts/{account_id}/positions"
+    # Headers, including the Authorization Bearer Token and Accept header
+    headers = {
+        'Authorization': f'Bearer {token}',
+        'Accept': 'application/json',
+    }
+    # Make the GET request
+    response = requests.get(positions_url, headers=headers)
+    data = response.json()
+    print(data)
+    return data
+
+
+class InProgress():
+    def __init__(self):
+        self.positions = {}
+    
+    def addSymbols(self, account_id, symbols):
+        self.positions[account_id] = symbols
+    
+    def isInProgress(self, account_id, symbol):
+        # TODO: Implement
+        accountSymbols = self.positions[account_id]
+        return symbol in accountSymbols
+
+
+def get_all_progress(token):
+    progress = InProgress()
+    ids = account_ids(token=token)
+    for id in ids:
+        symbols = account_symbols(account_id=id, token=token)
+        progress.addSymbols(id, symbols)
+    return progress
+
+
 def main():
     load_dotenv()
     token = os.getenv('TRADIER_ACCESS_TOKEN')
 
-    val = share_value(token, "AAPL")
-    print(f"APPL={val}")
+    progress = get_all_progress(token)
 
-    buy_share(
-        account_id="dummy/test",
-        token=token,
-        symbol="AAPL",
-    )
+    ids = account_ids(token=token)
+    for id in ids:
+        inProgress = progress.isInProgress(id, 'PIXY')
+        if inProgress:
+            print(id, 'has PIXY')
+        else:
+            print(id, 'does not have PIXY')
+
+
+    # val = share_value(token, "AAPL")
+    # print(f"APPL={val}")
+
+    # buy_share(
+    #     account_id="dummy/test",
+    #     token=token,
+    #     symbol="AAPL",
+    # )
 
     # # URL for the GET request
     # url = "https://api.tradier.com/v1/user/profile"
