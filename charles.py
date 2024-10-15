@@ -21,7 +21,8 @@ import os
 ## Post a warning if stock below certain limit (less $1)
 ## Handle errors: terminate if any error.
 
-
+## Idea: Dry run. Print the requests about to be submitted but don't submit them yet.
+## Good as a testing utility while developing.
 
 def design_order(
     symbol,
@@ -82,19 +83,19 @@ class InProgress():
                 symbol = position['instrument']['symbol']
                 self.positions[accountNumber].append(symbol)
         self.orders = orders
-    
+
     def isInProgress(self, accountNumber, symbol):
         # TODO: Implement
         accountSymbols = self.positions[accountNumber]
         return symbol in accountSymbols
 
 
-def buyStock(client, accountHash, symbol):
+def buyStock(client, accountHash, symbol, quantity):
     post_order_payload = design_order(
         symbol,
         order_type="MARKET",
         instruction="BUY",
-        quantity=f"1",
+        quantity=f"{quantity}",
         leg_id="1",
         order_leg_type="EQUITY",
         asset_type="EQUITY",
@@ -107,12 +108,12 @@ def buyStock(client, accountHash, symbol):
     print(body)
     return resp
 
-def sellStock(client, accountHash, symbol):
+def sellStock(client, accountHash, symbol, quantity):
     post_order_payload = design_order(
         symbol,
         order_type="MARKET",
         instruction="SELL",
-        quantity=f"1",
+        quantity=f"{quantity}",
         leg_id="1",
         order_leg_type="EQUITY",
         asset_type="EQUITY",
@@ -146,8 +147,6 @@ def main():
     # orders = client.account_orders_all().json()
     # json_string = json.dumps(details)
 
-    progress = InProgress(acctPositions=details, orders=None)
-
     # Create the parser object
     parser = argparse.ArgumentParser(description="Process stock transactions: buy or sell a stock")
 
@@ -159,6 +158,13 @@ def main():
     # Add the stock symbol argument
     parser.add_argument('symbol', type=str, help='The stock symbol to buy or sell')
 
+    parser.add_argument(
+        '--quantity',
+        type=int,
+        default=1,
+        help='Stock quantity',
+    )
+
     # Parse the arguments
     args = parser.parse_args()
 
@@ -168,6 +174,8 @@ def main():
     elif args.sell:
         print(f"Selling stock: {args.symbol}")
 
+    progress = InProgress(acctPositions=details, orders=None)
+
     for account in accounts:
         account_num = account['accountNumber']
         hash_val = account['hashValue']
@@ -176,12 +184,12 @@ def main():
         print(account_num, stockInProgress)
 
         if args.buy and not stockInProgress:
-            resp = buyStock(client=client, accountHash=hash_val, symbol=args.symbol)
-            if resp.status_code > 300:
+            resp = buyStock(client=client, accountHash=hash_val, symbol=args.symbol, quantity=args.quantity)
+            if resp.status_code >= 300:
                 break
         elif args.sell and stockInProgress:
-            resp = sellStock(client=client, accountHash=hash_val, symbol=args.symbol)
-            if resp.status_code > 300:
+            resp = sellStock(client=client, accountHash=hash_val, symbol=args.symbol, quantity=args.quantity)
+            if resp.status_code >= 300:
                 break
     # for account in accounts:
     #     account_num = account['accountNumber']

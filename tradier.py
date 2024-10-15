@@ -2,6 +2,7 @@ from dotenv import load_dotenv
 import json
 import os
 import requests
+import argparse
 
 
 # If data is a list, return that list.
@@ -43,17 +44,38 @@ def handle_account(account_id, token):
     print(f"account={account_id}", data)
 
 
-def buy_share(account_id, token, symbol):
-    order_class = "equity"
-    duration = "day"
-    side = "buy"
-    quantity = 1
-    order_type = "limit"
-    current_value = share_value(token, symbol)
-    print(f"current value {current_value}")
-    price = buying_limit(current_value)
-    print(f"buying with limit {price}")
-    # TODO: Implement the rest.
+def place_order(account_id, token, symbol, side, quantity):
+    orders_url = f"https://api.tradier.com/v1/accounts/{account_id}/orders"
+    # Headers, including the Authorization Bearer Token and Accept header
+    headers = {
+        'Authorization': f'Bearer {token}',
+        'Accept': 'application/json',
+    }
+    # class - The kind of order to be placed. One of: equity, option, multileg, combo.
+    # symbol - The symbol to be ordered.
+    # duration - The time for which the order will be remain in effect (Day or GTC).
+    # side - The side of the order (buy or sell).
+    # quantity - The number of shares to be ordered, in whole numbers.
+    # type - The type of order to be placed (market, limit, etc.)
+    ##
+    # POST /v1/accounts/12345678/orders HTTP/1.1
+    # Host: api.tradier.com
+    # Accept: \*/\*
+    # class=equity&symbol=AAPL&duration=day&side=buy&quantity=100&type=market
+    params = {
+        "class": "equity",
+        "symbol": symbol,
+        "duration": "day",
+        "side": side,
+        "quantity": quantity,
+        "type": "market",
+    }
+    print(account_id, params)
+    # Make the GET request
+    response = requests.post(orders_url, headers=headers, params=params)
+    print(response.status_code)
+    print(response.text)
+    return response
 
 
 def share_value(token, symbol):
@@ -138,10 +160,10 @@ def account_positions(account_id, token):
 class InProgress():
     def __init__(self):
         self.positions = {}
-    
+
     def addSymbols(self, account_id, symbols):
         self.positions[account_id] = symbols
-    
+
     def isInProgress(self, account_id, symbol):
         # TODO: Implement
         accountSymbols = self.positions[account_id]
@@ -161,15 +183,58 @@ def main():
     load_dotenv()
     token = os.getenv('TRADIER_ACCESS_TOKEN')
 
+    # Create the parser object
+    parser = argparse.ArgumentParser(description="Process stock transactions: buy or sell a stock")
+
+    # Add mutually exclusive group for --buy and --sell
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument('--buy', action='store_true', help='Buy a stock')
+    group.add_argument('--sell', action='store_true', help='Sell a stock')
+
+    # Add the stock symbol argument
+    parser.add_argument('symbol', type=str, help='The stock symbol to buy or sell')
+
+    parser.add_argument(
+        '--quantity',
+        type=int,
+        default=1,
+        help='Stock quantity',
+    )
+
+    # Parse the arguments
+    args = parser.parse_args()
+
+    # Handle buy or sell action
+    if args.buy:
+        print(f"Buying stock: {args.symbol}")
+    elif args.sell:
+        print(f"Selling stock: {args.symbol}")
+
     progress = get_all_progress(token)
 
     ids = account_ids(token=token)
     for id in ids:
-        inProgress = progress.isInProgress(id, 'PIXY')
-        if inProgress:
-            print(id, 'has PIXY')
-        else:
-            print(id, 'does not have PIXY')
+        stockInProgress = progress.isInProgress(id, args.symbol)
+        if args.buy and not stockInProgress:
+            resp = place_order(
+                account_id=id,
+                token=token,
+                symbol=args.symbol,
+                side="buy",
+                quantity=1,
+            )
+            if resp.status_code >= 300:
+                break
+        elif args.sell and stockInProgress:
+            resp = place_order(
+                account_id=id,
+                token=token,
+                symbol=args.symbol,
+                side="sell",
+                quantity=1,
+            )
+            if resp.status_code >= 300:
+                break
 
 
     # val = share_value(token, "AAPL")
@@ -206,7 +271,7 @@ def main():
     #     print(account["account_number"])
     #     for account in accounts:
     #         handle_account(account["account_number"], token)
-            
+
     # else:
     #     # Print error details
     #     print(f"Error: {response.status_code}, {response.text}")
