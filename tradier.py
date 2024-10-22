@@ -138,6 +138,7 @@ def account_symbols(account_id, token):
     if positions['positions'] == 'null':
         return symbols
     found_positions = positions['positions']['position']
+    found_positions = validate_list(found_positions)
     for each in found_positions:
         symbols.append(each['symbol'])
     return symbols

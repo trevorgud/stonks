@@ -10,6 +10,6 @@ python3 -m venv .venv
 
 .\.venv\Scripts\python ./charles.py --buy PIXY
 .\.venv\Scripts\python ./charles.py --sell PIXY
-.\.venv\Scripts\python ./tradier.py --buy PIXY 1
-.\.venv\Scripts\python ./tradier.py --sell PIXY 1
+.\.venv\Scripts\python ./tradier.py --buy PIXY --quantity 1
+.\.venv\Scripts\python ./tradier.py --sell PIXY --quantity 1
 ```

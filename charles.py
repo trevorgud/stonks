@@ -24,6 +24,9 @@ import os
 ## Idea: Dry run. Print the requests about to be submitted but don't submit them yet.
 ## Good as a testing utility while developing.
 
+## Idea: Implement optional limit orders: --limit 0.15
+## Absence of --limit flag would assume a market order.
+
 def design_order(
     symbol,
     order_type,
